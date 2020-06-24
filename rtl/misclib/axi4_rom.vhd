@@ -35,6 +35,7 @@ entity axi4_rom is
     async_reset : boolean := false;
     xaddr    : integer := 0;
     xmask    : integer := 16#fffff#;
+    power_sim_estimation : boolean := false;
     sim_hexfile : string
   );
   port (
@@ -68,33 +69,66 @@ architecture arch_axi4_rom of axi4_rom is
 begin
   cfg  <= xconfig;
 
-  axi0 :  axi4_slave generic map (
-    async_reset => async_reset
-  ) port map (
-    i_clk => clk,
-    i_nrst => nrst,
-    i_xcfg => xconfig, 
-    i_xslvi => i,
-    o_xslvo => o,
-    i_ready => '1',
-    i_rdata => rdata,
-    o_re => open,
-    o_r32 => open,
-    o_radr => raddr,
-    o_wadr => open,
-    o_we => open,
-    o_wstrb => open,
-    o_wdata => open
-  );
+  boot_gen : if xaddr = 16#00000# generate
+    axi0 :  axi4_slave generic map (
+      async_reset => async_reset
+    ) port map (
+      i_clk => clk,
+      i_nrst => nrst,
+      i_xcfg => xconfig, 
+      i_xslvi => i,
+      o_xslvo => o,
+      i_ready => '1',
+      i_rdata => rdata,
+      o_re => open,
+      o_r32 => open,
+      o_radr => raddr,
+      o_wadr => open,
+      o_we => open,
+      o_wstrb => open,
+      o_wdata => open
+    );
 
-  tech0 : Rom_tech generic map (
-    memtech => memtech,
-    abits => abits,
-    sim_hexfile => sim_hexfile
-  ) port map (
-    clk => clk,
-    address => raddr,
-    data => rdata
-  );
+    tech0 : Rom_tech generic map (
+      memtech => memtech,
+      abits => abits,
+      sim_hexfile => sim_hexfile
+    ) port map (
+      clk => clk,
+      address => raddr,
+      data => rdata
+    );
+  end generate boot_gen;
+
+  fw_boot_gen : if xaddr = 16#00010# generate
+    axi0 :  axi4_slave generic map (
+      async_reset => async_reset
+    ) port map (
+      i_clk => clk,
+      i_nrst => nrst,
+      i_xcfg => xconfig, 
+      i_xslvi => i,
+      o_xslvo => o,
+      i_ready => '1',
+      i_rdata => rdata,
+      o_re => open,
+      o_r32 => open,
+      o_radr => raddr,
+      o_wadr => open,
+      o_we => open,
+      o_wstrb => open,
+      o_wdata => open
+    );
+
+    tech0 : Rom_tech generic map (
+      memtech => memtech,
+      abits => abits,
+      sim_hexfile => sim_hexfile
+    ) port map (
+      clk => clk,
+      address => raddr,
+      data => rdata
+    );
+  end generate fw_boot_gen;
 
 end;

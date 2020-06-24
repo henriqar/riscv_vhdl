@@ -21,7 +21,11 @@ use std.textio.all;
 library commonlib;
 use commonlib.types_util.all;
 
-entity asic_top_tb is
+entity asic_top_tb is 
+  generic (
+    power_sim_estimation : boolean := false;
+    power_hex_file : string
+  );
 end asic_top_tb;
 
 architecture behavior of asic_top_tb is
@@ -71,7 +75,11 @@ architecture behavior of asic_top_tb is
   constant JTAG_WR_ENA : std_logic := '0';
   constant ETH_WR_ENA : std_logic := '0';
   
-  component asic_top is port ( 
+  component asic_top is generic (
+    power_sim_estimation : boolean := false;
+    power_hex_file : string
+  );
+  port ( 
     i_rst     : in std_logic;
     i_sclk_p  : in std_logic;
     i_sclk_n  : in std_logic;
@@ -299,7 +307,11 @@ begin
   );
 
   -- signal parsment and assignment
-  tt : asic_top port map
+  tt : asic_top generic map (
+    power_sim_estimation => power_sim_estimation,
+    power_hex_file => power_hex_file
+  )
+  port map
   (
     i_rst     => i_rst,
     i_sclk_p  => i_sclk_p,

@@ -55,8 +55,12 @@ use work.config_target.all;
 --! @brief   SOC Top-level entity declaration.
 --! @details This module implements full SOC functionality and all IO signals
 --!          are available on FPGA/ASIC IO pins.
-entity riscv_soc is port 
-( 
+entity riscv_soc is 
+  generic (
+    power_sim_estimation : boolean := false;
+    power_hex_file : string
+  );
+  port ( 
   i_rst : in std_logic;
   i_clk  : in std_logic;
   --! GPIO.
@@ -218,7 +222,8 @@ begin
             async_reset => CFG_ASYNC_RESET,
             fpu_ena => true,
             coherence_ena => false,
-            tracer_ena => false
+            tracer_ena => false,
+            power_sim_estimation => power_sim_estimation
           ) port map ( 
             i_nrst   => w_bus_nrst,
             i_clk    => i_clk,
@@ -329,19 +334,40 @@ end generate;
   --! @brief BOOT ROM module instance with the AXI4 interface.
   --! @details Map address:
   --!          0x00000000..0x00007fff (32 KB total)
-  boot0 : axi4_rom generic map (
-    memtech  => CFG_MEMTECH,
-    async_reset => CFG_ASYNC_RESET,
-    xaddr    => 16#00000#,
-    xmask    => 16#ffff8#,
-    sim_hexfile => CFG_SIM_BOOTROM_HEX
-  ) port map (
-    clk  => i_clk,
-    nrst => w_glob_nrst,
-    cfg  => slv_cfg(CFG_BUS0_XSLV_BOOTROM),
-    i    => axisi(CFG_BUS0_XSLV_BOOTROM),
-    o    => axiso(CFG_BUS0_XSLV_BOOTROM)
-  );
+  normal_boot : if power_sim_estimation = false generate
+    boot0 : axi4_rom generic map (
+      memtech  => CFG_MEMTECH,
+      async_reset => CFG_ASYNC_RESET,
+      xaddr    => 16#00000#,
+      xmask    => 16#ffff8#,
+      --sim_hexfile => CFG_SIM_BOOTROM_HEX,
+      sim_hexfile => "./../../../examples/power-nangate15/test/0_add_10x20.riscv.hex",
+      power_sim_estimation => false
+    ) port map (
+      clk  => i_clk,
+      nrst => w_glob_nrst,
+      cfg  => slv_cfg(CFG_BUS0_XSLV_BOOTROM),
+      i    => axisi(CFG_BUS0_XSLV_BOOTROM),
+      o    => axiso(CFG_BUS0_XSLV_BOOTROM)
+    );
+  end generate normal_boot;
+
+  power_boot : if power_sim_estimation = true generate
+    power_boot0 : axi4_rom generic map (
+      memtech  => CFG_MEMTECH,
+      async_reset => CFG_ASYNC_RESET,
+      xaddr    => 16#00000#,
+      xmask    => 16#ffff8#,
+      sim_hexfile => power_hex_file,
+      power_sim_estimation => true
+    ) port map (
+      clk  => i_clk,
+      nrst => w_glob_nrst,
+      cfg  => slv_cfg(CFG_BUS0_XSLV_BOOTROM),
+      i    => axisi(CFG_BUS0_XSLV_BOOTROM),
+      o    => axiso(CFG_BUS0_XSLV_BOOTROM)
+    );
+end generate power_boot;
 
   ------------------------------------
   --! @brief OTP module instance with the AXI4 interface.
@@ -385,19 +411,22 @@ end generate;
   --! @details Map address:
   --!          0x00100000..0x0013ffff (256 KB total)
   --! @warning Don't forget to change ROM_ADDR_WIDTH in rom implementation
-  img0 : axi4_rom generic map (
-    memtech  => CFG_MEMTECH,
-    async_reset => CFG_ASYNC_RESET,
-    xaddr    => 16#00100#,
-    xmask    => 16#fffc0#,
-    sim_hexfile => CFG_SIM_FWIMAGE_HEX
-  ) port map (
-    clk  => i_clk,
-    nrst => w_glob_nrst,
-    cfg  => slv_cfg(CFG_BUS0_XSLV_ROMIMAGE),
-    i    => axisi(CFG_BUS0_XSLV_ROMIMAGE),
-    o    => axiso(CFG_BUS0_XSLV_ROMIMAGE)
-  );
+  fw_boot : if power_sim_estimation = false generate
+    img0 : axi4_rom generic map (
+      memtech  => CFG_MEMTECH,
+      async_reset => CFG_ASYNC_RESET,
+      xaddr    => 16#00100#,
+      xmask    => 16#fffc0#,
+      sim_hexfile => CFG_SIM_FWIMAGE_HEX,
+      power_sim_estimation => false
+    ) port map (
+      clk  => i_clk,
+      nrst => w_glob_nrst,
+      cfg  => slv_cfg(CFG_BUS0_XSLV_ROMIMAGE),
+      i    => axisi(CFG_BUS0_XSLV_ROMIMAGE),
+      o    => axiso(CFG_BUS0_XSLV_ROMIMAGE)
+    );
+  end generate fw_boot;
 
   ------------------------------------
   --! @brief SPI FLASH module isntance with the AXI4 interface.

@@ -180,6 +180,7 @@ type dport_out_vector is array (0 to CFG_TOTAL_CPU_MAX-1)
 --! @param[in] i_ext_irq  Interrupts line supported by Rocket chip.
 component river_amba is 
   generic (
+    power_sim_estimation : boolean := false;
     memtech : integer;
     hartid : integer;
     async_reset : boolean;
@@ -211,6 +212,67 @@ component river_serdes is
     i_msti  : in axi4_master_in_type;
     o_msto  : out axi4_master_out_type
 );
+end component;
+
+component ProcessorNanGate15 is
+  port (
+      i_clk : in std_logic;                                             -- CPU clock
+      i_nrst : in std_logic;                                            -- Reset. Active LOW.
+      -- Control path:
+      i_req_ctrl_ready : in std_logic;                                  -- ICache is ready to accept request
+      o_req_ctrl_valid : out std_logic;                                 -- Request to ICache is valid
+      o_req_ctrl_addr : out std_logic_vector(CFG_CPU_ADDR_BITS-1 downto 0);-- Requesting address to ICache
+      i_resp_ctrl_valid : in std_logic;                                 -- ICache response is valid
+      i_resp_ctrl_addr : in std_logic_vector(CFG_CPU_ADDR_BITS-1 downto 0);-- Response address must be equal to the latest request address
+      i_resp_ctrl_data : in std_logic_vector(31 downto 0);              -- Read value
+      i_resp_ctrl_load_fault : in std_logic;                            -- bus response with error
+      i_resp_ctrl_executable : in std_logic;
+      o_resp_ctrl_ready : out std_logic;
+      -- Data path:
+      i_req_data_ready : in std_logic;                                  -- DCache is ready to accept request
+      o_req_data_valid : out std_logic;                                 -- Request to DCache is valid
+      o_req_data_write : out std_logic;                                 -- Read/Write transaction
+      o_req_data_addr : out std_logic_vector(CFG_CPU_ADDR_BITS-1 downto 0);-- Requesting address to DCache
+      o_req_data_wdata : out std_logic_vector(63 downto 0);             -- Writing value
+      o_req_data_wstrb : out std_logic_vector(7 downto 0);              -- 8-bytes aligned strobs
+      i_resp_data_valid : in std_logic;                                 -- DCache response is valid
+      i_resp_data_addr : in std_logic_vector(CFG_CPU_ADDR_BITS-1 downto 0);-- DCache response address must be equal to the latest request address
+      i_resp_data_data : in std_logic_vector(63 downto 0);              -- Read value
+      i_resp_data_store_fault_addr : in std_logic_vector(CFG_CPU_ADDR_BITS-1 downto 0);
+      i_resp_data_load_fault : in std_logic;                            -- Bus response with SLVERR or DECERR on read
+      i_resp_data_store_fault : in std_logic;                           -- Bus response with SLVERR or DECERR on write
+      i_resp_data_er_mpu_load : in std_logic;
+      i_resp_data_er_mpu_store : in std_logic;
+      o_resp_data_ready : out std_logic;
+      -- External interrupt pin
+      i_ext_irq : in std_logic;                                         -- PLIC interrupt accordingly with spec
+      o_time : out std_logic_vector(63 downto 0);                       -- Timer in clock except halt state
+      o_exec_cnt : out std_logic_vector(63 downto 0);
+      -- MPU interface
+      o_mpu_region_we : out std_logic;
+      o_mpu_region_idx : out std_logic_vector(CFG_MPU_TBL_WIDTH-1 downto 0);
+      o_mpu_region_addr : out std_logic_vector(CFG_CPU_ADDR_BITS-1 downto 0);
+      o_mpu_region_mask : out std_logic_vector(CFG_CPU_ADDR_BITS-1 downto 0);
+      o_mpu_region_flags : out std_logic_vector(CFG_MPU_FL_TOTAL-1 downto 0);  -- {ena, cachable, r, w, x}
+      -- Debug interface:
+      i_dport_valid : in std_logic;                                     -- Debug access from DSU is valid
+      i_dport_write : in std_logic;                                     -- Write command flag
+      i_dport_region : in std_logic_vector(1 downto 0);                 -- Registers region ID: 0=CSR; 1=IREGS; 2=Control
+      i_dport_addr : in std_logic_vector(11 downto 0);                  -- Register idx
+      i_dport_wdata : in std_logic_vector(RISCV_ARCH-1 downto 0);       -- Write value
+      o_dport_ready : out std_logic;                                    -- Response is ready
+      o_dport_rdata : out std_logic_vector(RISCV_ARCH-1 downto 0);      -- Response value
+      o_halted : out std_logic;
+      -- Debug signals:
+      o_flush_address : out std_logic_vector(CFG_CPU_ADDR_BITS-1 downto 0);-- Address of instruction to remove from ICache
+      o_flush_valid : out std_logic;                                    -- Remove address from ICache is valid
+      o_data_flush_address : out std_logic_vector(CFG_CPU_ADDR_BITS-1 downto 0);    -- Address of instruction to remove from D$
+      o_data_flush_valid : out std_logic;                               -- Remove address from D$ is valid
+      i_data_flush_end : in std_logic;
+      i_istate : in std_logic_vector(3 downto 0);                       -- ICache state machine value
+      i_dstate : in std_logic_vector(3 downto 0);                       -- DCache state machine value
+      i_cstate : in std_logic_vector(1 downto 0)                        -- CacheTop state machine value
+    );
 end component;
 
 end; -- package body

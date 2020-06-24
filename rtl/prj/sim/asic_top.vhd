@@ -38,7 +38,11 @@ library work;
 --! Target dependable configuration: RTL, FPGA or ASIC.
 use work.config_target.all;
 
-entity asic_top is port 
+entity asic_top is generic (
+  power_sim_estimation : boolean := false;
+  power_hex_file : string
+);
+port 
 ( 
   --! Input reset. Active HIGH.
   i_rst     : in std_logic;
@@ -95,8 +99,12 @@ end asic_top;
 
 architecture arch_asic_top of asic_top is
 
-component riscv_soc is port 
-( 
+component riscv_soc is 
+generic (
+    power_sim_estimation : boolean := false;
+    power_hex_file : string
+  );
+port ( 
   i_rst     : in std_logic;
   i_clk  : in std_logic;
   --! GPIO.
@@ -305,8 +313,10 @@ begin
   );
 
 
-  soc0 : riscv_soc port map
-  ( 
+  soc0 : riscv_soc generic map (
+    power_sim_estimation => power_sim_estimation,
+    power_hex_file => power_hex_file
+  ) port map ( 
     i_rst  => w_ext_reset,
     i_clk  => w_clk_bus,
     --! GPIO.

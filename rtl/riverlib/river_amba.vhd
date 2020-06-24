@@ -33,6 +33,7 @@ use riverlib.types_river.all;
 
 entity river_amba is 
   generic (
+    power_sim_estimation : boolean := false;
     memtech : integer;
     hartid : integer;
     async_reset : boolean;
@@ -132,6 +133,7 @@ begin
   o_mstcfg <= xconfig;
   
   river0 : RiverTop  generic map (
+      power_sim_estimation => power_sim_estimation,
       memtech => memtech,
       hartid => hartid,
       async_reset => async_reset,

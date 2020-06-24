@@ -1,0 +1,10 @@
+set intovf_severity_level warning
+set intovf_severity_level IGNORE
+database -open sim_waves -default -event
+# probe -create -shm :tt:soc0:cpuslotx:0:cpux:river0:river0:netlist_generate:proc0 -depth to_cells -all -database sim_waves
+probe -create -shm :tt:soc0:cpuslotx(0):cpux:river0:river0:netlist_generate:proc0 -depth all -all -database sim_waves -packed 4k -unpacked 16k 
+reset
+dumptcf -scope :tt:soc0:cpuslotx(0):cpux:river0:river0:netlist_generate:proc0 -overwrite -dumpwireasnet -internal -output tcf_files/sub.tcf
+run $timebomb 
+dumptcf -end  
+exit  

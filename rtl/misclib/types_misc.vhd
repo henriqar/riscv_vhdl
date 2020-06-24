@@ -71,7 +71,8 @@ generic (
     async_reset : boolean := false;
     xaddr    : integer := 0;
     xmask    : integer := 16#fffff#;
-    sim_hexfile : string
+    sim_hexfile : string;
+    power_sim_estimation : boolean := false
   );
 port (
     clk  : in std_logic;

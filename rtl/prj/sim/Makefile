@@ -10,10 +10,17 @@ CYCLES=30000
 
 INC=+incdir+${RTL_HOME}
 VLOG_PARAMS_TB=-64 -sv -work work
-VHDL_PARAMS=-64 -v93 -smartorder
+VHDL_PARAMS=-64 -v93 -smartorder -V200X
 ELAB_PARAMS=-64 -v93 -namemap_mixgen -timescale ${TIMESCALE} \
             -access +rwc
 SIM_OPTS = -64 -input ./ncsim_settings work.${BENCH} +cycles=${CYCLES}
+
+TOOL_PATH := ${XCELIUM}
+POWER_DIR := ${TOP_ROOT}/../examples/power-nangate15/test
+# POWER_DIR := ${TOP_ROOT}/../examples/power-nangate15/rv64g-hex
+POWER_HEX_SRCS=$(wildcard $(POWER_DIR)/*.hex)
+POWER_TIMEBOMB := 20ms
+POWER_SIM_OPTS = -64 -input ./ncsim_power_settings +cycles=${CYCLES} work.${BENCH}
 
 prep:
 	@mkdir -p work
@@ -24,6 +31,8 @@ prep:
 	@mkdir -p riverlib 
 	@mkdir -p commonlib
 	@mkdir -p gnsslib 
+	@mkdir -p tcf_files 
+	@mkdir -p xmsimlog 
 
 clr_logs:
 	@rm -f *.log
@@ -33,7 +42,7 @@ clr_logs:
 
 
 comp: prep clr_logs
-	@ncvlog ${VLOG_PARAMS_TB} ${INC}   	-f	vlog.f
+	@ncvlog ${VLOG_PARAMS_TB} ${INC}        -f  vlog.f
 	@ncvhdl ${VHDL_PARAMS} -work commonlib 	-f 	lists/commonlib.f
 	@ncvhdl ${VHDL_PARAMS} -work ambalib   	-f 	lists/ambalib.f
 	@ncvhdl ${VHDL_PARAMS} -work techmap   	-f 	lists/techmap.f
@@ -49,6 +58,50 @@ build: comp
 gui:clr_logs
 	@ncsim ${SIM_OPTS} -gui
 
+sim-pre-power: prep clr_logs
+	@{  set -e;\
+		for test in $(POWER_HEX_SRCS); do \
+			hexname=`basename $$test`; \
+			printf "\033[0;32mCompiling $$hexname\033[0m\n"; \
+	        ${TOOL_PATH}/xmvlog ${VLOG_PARAMS_TB} ${INC}   	    -f	vlog.f; \
+	        ${TOOL_PATH}/xmvhdl ${VHDL_PARAMS} -work commonlib 	-f  lists/commonlib.f; \
+	        ${TOOL_PATH}/xmvhdl ${VHDL_PARAMS} -work ambalib   	-f  lists/ambalib.f; \
+	        ${TOOL_PATH}/xmvhdl ${VHDL_PARAMS} -work techmap   	-f  lists/techmap.f; \
+	        ${TOOL_PATH}/xmvhdl ${VHDL_PARAMS} -work ethlib 	-f  lists/ethlib.f; \
+	        ${TOOL_PATH}/xmvhdl ${VHDL_PARAMS} -work misclib  	-f  lists/misclib.f; \
+	        ${TOOL_PATH}/xmvhdl ${VHDL_PARAMS} -work riverlib  	-f  lists/riverlib.f; \
+	        ${TOOL_PATH}/xmvhdl ${VHDL_PARAMS} -work gnsslib  	-f  lists/gnsslib.f; \
+	        ${TOOL_PATH}/xmvhdl ${VHDL_PARAMS} -work work      	-f  vhdl.f; \
+			printf "\033[0;32mElaborating $$hexname\033[0m\n"; \
+	        ${TOOL_PATH}/xmelab ${ELAB_PARAMS} -work work -generic 'power_sim_estimation=>"false"' -generic "power_hex_file=>\"./$$test\"" ${BENCH}; \
+			printf "\033[0;32mRunning $$hexname\033[0m\n"; \
+			sed "s/sub/$$hexname/g; s/\$$timebomb/${POWER_TIMEBOMB}/g" xmsim_power_settings > ncsim_power_settings; \
+	        ${TOOL_PATH}/xmsim ${POWER_SIM_OPTS} -logfile xmsimlog/$$hexname.log; \
+		done; \
+	}
+
+sim-pos-power: prep clr_logs
+	@{  set -e;\
+		for test in $(POWER_HEX_SRCS); do \
+			hexname=`basename $$test`; \
+			printf "\033[0;32mCompiling $$hexname\033[0m\n"; \
+	        ${TOOL_PATH}/xmvlog ${VLOG_PARAMS_TB} ${INC}   	    -f	vlog_power.f; \
+	        ${TOOL_PATH}/xmvhdl ${VHDL_PARAMS} -work commonlib 	-f  lists/commonlib.f; \
+	        ${TOOL_PATH}/xmvhdl ${VHDL_PARAMS} -work ambalib   	-f  lists/ambalib.f; \
+	        ${TOOL_PATH}/xmvhdl ${VHDL_PARAMS} -work techmap   	-f  lists/techmap.f; \
+	        ${TOOL_PATH}/xmvhdl ${VHDL_PARAMS} -work ethlib 	-f  lists/ethlib.f; \
+	        ${TOOL_PATH}/xmvhdl ${VHDL_PARAMS} -work misclib  	-f  lists/misclib.f; \
+	        ${TOOL_PATH}/xmvhdl ${VHDL_PARAMS} -work riverlib  	-f  lists/riverlib.f; \
+	        ${TOOL_PATH}/xmvhdl ${VHDL_PARAMS} -work gnsslib  	-f  lists/gnsslib.f; \
+	        ${TOOL_PATH}/xmvhdl ${VHDL_PARAMS} -work work      	-f  vhdl.f; \
+			printf "\033[0;32mElaborating $$hexname\033[0m\n"; \
+	        ${TOOL_PATH}/xmelab ${ELAB_PARAMS} -work work -generic 'power_sim_estimation=>"true"' -generic "power_hex_file=>\"./$$test\"" ${BENCH}; \
+			printf "\033[0;32mRunning $$hexname\033[0m\n"; \
+			sed "s/sub/$$hexname/g; s/\$$timebomb/${POWER_TIMEBOMB}/g" xmsim_power_settings > ncsim_power_settings; \
+	        ${TOOL_PATH}/xmsim ${POWER_SIM_OPTS} -logfile xmsimlog/$$hexname.log; \
+		done; \
+	}
+
 clean:
 	@rm -f *.log *.key *.diag *.err
 	@rm -rf gnsslib commonlib ambalib techmap ethlib misclib riverlib work
@@ -58,3 +111,4 @@ clean:
 	@rm -f ./*.errmsg* ./*.mix
 	@rm -f ./*.X
 	@rm -rf ./*.shm
+	@rm -rf ./xmsimlog

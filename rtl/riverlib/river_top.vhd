@@ -16,12 +16,19 @@
 
 library ieee;
 use ieee.std_logic_1164.all;
+use ieee.std_logic_textio.all;
+use ieee.numeric_std.all;
+use std.textio.all;
 library commonlib;
 use commonlib.types_common.all;
 --! RIVER CPU specific library.
 library riverlib;
 --! RIVER CPU configuration constants.
 use riverlib.river_cfg.all;
+--! River Netlist component declaration
+use riverlib.types_river.all;
+library ambalib;
+use ambalib.types_amba4.all;
 
 entity RiverTop is
   generic (
@@ -30,7 +37,8 @@ entity RiverTop is
     async_reset : boolean := false;
     fpu_ena : boolean := true;
     coherence_ena : boolean := false;
-    tracer_ena : boolean := false
+    tracer_ena : boolean := false;
+    power_sim_estimation : boolean := false
   );
   port (
     i_clk : in std_logic;                                             -- CPU clock
@@ -115,66 +123,162 @@ architecture arch_RiverTop of RiverTop is
   signal wb_dstate : std_logic_vector(3 downto 0);
   signal wb_cstate : std_logic_vector(1 downto 0);
 
+  constant POWER_SIM_STOP_ADDR : std_logic_vector(CFG_SYSBUS_ADDR_BITS-1 downto 0) := "00000000000000000001111111110000";
+
 begin
 
-    proc0 : Processor generic map (
-        hartid => hartid,
-        async_reset => async_reset,
-        fpu_ena => fpu_ena,
-        tracer_ena => tracer_ena
-      ) port map (
-        i_clk => i_clk,
-        i_nrst => i_nrst,
-        i_req_ctrl_ready => w_req_ctrl_ready,
-        o_req_ctrl_valid => w_req_ctrl_valid,
-        o_req_ctrl_addr => wb_req_ctrl_addr,
-        i_resp_ctrl_valid => w_resp_ctrl_valid,
-        i_resp_ctrl_addr => wb_resp_ctrl_addr,
-        i_resp_ctrl_data => wb_resp_ctrl_data,
-        i_resp_ctrl_load_fault => w_resp_ctrl_load_fault,
-        i_resp_ctrl_executable => w_resp_ctrl_executable,
-        o_resp_ctrl_ready => w_resp_ctrl_ready,
-        i_req_data_ready => w_req_data_ready,
-        o_req_data_valid => w_req_data_valid,
-        o_req_data_write => w_req_data_write,
-        o_req_data_addr => wb_req_data_addr,
-        o_req_data_wdata => wb_req_data_wdata,
-        o_req_data_wstrb => wb_req_data_wstrb,
-        i_resp_data_valid => w_resp_data_valid,
-        i_resp_data_addr => wb_resp_data_addr,
-        i_resp_data_data => wb_resp_data_data,
-        i_resp_data_store_fault_addr => wb_resp_data_store_fault_addr,
-        i_resp_data_load_fault => w_resp_data_load_fault,
-        i_resp_data_store_fault => w_resp_data_store_fault,
-        i_resp_data_er_mpu_load => w_resp_data_er_mpu_load,
-        i_resp_data_er_mpu_store => w_resp_data_er_mpu_store,
-        o_resp_data_ready => w_resp_data_ready,
-        i_ext_irq => i_ext_irq,
-        o_time => o_time,
-        o_exec_cnt => o_exec_cnt,
-        o_mpu_region_we => w_mpu_region_we,
-        o_mpu_region_idx => wb_mpu_region_idx,
-        o_mpu_region_addr => wb_mpu_region_addr,
-        o_mpu_region_mask => wb_mpu_region_mask,
-        o_mpu_region_flags => wb_mpu_region_flags,
-        i_dport_valid => i_dport_valid,
-        i_dport_write => i_dport_write,
-        i_dport_region => i_dport_region,
-        i_dport_addr => i_dport_addr,
-        i_dport_wdata => i_dport_wdata,
-        o_dport_ready => o_dport_ready,
-        o_dport_rdata => o_dport_rdata,
-        o_halted => o_halted,
-        o_flush_address => wb_flush_address,
-        o_flush_valid => w_flush_valid,
-        o_data_flush_address => wb_data_flush_address,
-        o_data_flush_valid => w_data_flush_valid,
-        i_data_flush_end => w_data_flush_end,
-        i_istate => wb_istate,
-        i_dstate => wb_dstate,
-        i_cstate => wb_cstate);
+    rtl_generate : if power_sim_estimation = false generate
+        proc0 : Processor generic map (
+            hartid => hartid,
+            async_reset => async_reset,
+            fpu_ena => fpu_ena,
+            tracer_ena => tracer_ena
+          ) port map (
+            i_clk => i_clk,
+            i_nrst => i_nrst,
+            i_req_ctrl_ready => w_req_ctrl_ready,
+            o_req_ctrl_valid => w_req_ctrl_valid,
+            o_req_ctrl_addr => wb_req_ctrl_addr,
+            i_resp_ctrl_valid => w_resp_ctrl_valid,
+            i_resp_ctrl_addr => wb_resp_ctrl_addr,
+            i_resp_ctrl_data => wb_resp_ctrl_data,
+            i_resp_ctrl_load_fault => w_resp_ctrl_load_fault,
+            i_resp_ctrl_executable => w_resp_ctrl_executable,
+            o_resp_ctrl_ready => w_resp_ctrl_ready,
+            i_req_data_ready => w_req_data_ready,
+            o_req_data_valid => w_req_data_valid,
+            o_req_data_write => w_req_data_write,
+            o_req_data_addr => wb_req_data_addr,
+            o_req_data_wdata => wb_req_data_wdata,
+            o_req_data_wstrb => wb_req_data_wstrb,
+            i_resp_data_valid => w_resp_data_valid,
+            i_resp_data_addr => wb_resp_data_addr,
+            i_resp_data_data => wb_resp_data_data,
+            i_resp_data_store_fault_addr => wb_resp_data_store_fault_addr,
+            i_resp_data_load_fault => w_resp_data_load_fault,
+            i_resp_data_store_fault => w_resp_data_store_fault,
+            i_resp_data_er_mpu_load => w_resp_data_er_mpu_load,
+            i_resp_data_er_mpu_store => w_resp_data_er_mpu_store,
+            o_resp_data_ready => w_resp_data_ready,
+            i_ext_irq => i_ext_irq,
+            o_time => o_time,
+            o_exec_cnt => o_exec_cnt,
+            o_mpu_region_we => w_mpu_region_we,
+            o_mpu_region_idx => wb_mpu_region_idx,
+            o_mpu_region_addr => wb_mpu_region_addr,
+            o_mpu_region_mask => wb_mpu_region_mask,
+            o_mpu_region_flags => wb_mpu_region_flags,
+            i_dport_valid => i_dport_valid,
+            i_dport_write => i_dport_write,
+            i_dport_region => i_dport_region,
+            i_dport_addr => i_dport_addr,
+            i_dport_wdata => i_dport_wdata,
+            o_dport_ready => o_dport_ready,
+            o_dport_rdata => o_dport_rdata,
+            o_halted => o_halted,
+            o_flush_address => wb_flush_address,
+            o_flush_valid => w_flush_valid,
+            o_data_flush_address => wb_data_flush_address,
+            o_data_flush_valid => w_data_flush_valid,
+            i_data_flush_end => w_data_flush_end,
+            i_istate => wb_istate,
+            i_dstate => wb_dstate,
+            i_cstate => wb_cstate);
+      end generate rtl_generate;
 
-    cache0 :  CacheTop generic map (
+    netlist_generate : if power_sim_estimation = true generate
+        proc0 : ProcessorNanGate15 port map (
+            i_clk => i_clk,
+            i_nrst => i_nrst,
+            i_req_ctrl_ready => w_req_ctrl_ready,
+            o_req_ctrl_valid => w_req_ctrl_valid,
+            o_req_ctrl_addr => wb_req_ctrl_addr,
+            i_resp_ctrl_valid => w_resp_ctrl_valid,
+            i_resp_ctrl_addr => wb_resp_ctrl_addr,
+            i_resp_ctrl_data => wb_resp_ctrl_data,
+            i_resp_ctrl_load_fault => w_resp_ctrl_load_fault,
+            i_resp_ctrl_executable => w_resp_ctrl_executable,
+            o_resp_ctrl_ready => w_resp_ctrl_ready,
+            i_req_data_ready => w_req_data_ready,
+            o_req_data_valid => w_req_data_valid,
+            o_req_data_write => w_req_data_write,
+            o_req_data_addr => wb_req_data_addr,
+            o_req_data_wdata => wb_req_data_wdata,
+            o_req_data_wstrb => wb_req_data_wstrb,
+            i_resp_data_valid => w_resp_data_valid,
+            i_resp_data_addr => wb_resp_data_addr,
+            i_resp_data_data => wb_resp_data_data,
+            i_resp_data_store_fault_addr => wb_resp_data_store_fault_addr,
+            i_resp_data_load_fault => w_resp_data_load_fault,
+            i_resp_data_store_fault => w_resp_data_store_fault,
+            i_resp_data_er_mpu_load => w_resp_data_er_mpu_load,
+            i_resp_data_er_mpu_store => w_resp_data_er_mpu_store,
+            o_resp_data_ready => w_resp_data_ready,
+            i_ext_irq => i_ext_irq,
+            o_time => o_time,
+            o_exec_cnt => o_exec_cnt,
+            o_mpu_region_we => w_mpu_region_we,
+            o_mpu_region_idx => wb_mpu_region_idx,
+            o_mpu_region_addr => wb_mpu_region_addr,
+            o_mpu_region_mask => wb_mpu_region_mask,
+            o_mpu_region_flags => wb_mpu_region_flags,
+            i_dport_valid => i_dport_valid,
+            i_dport_write => i_dport_write,
+            i_dport_region => i_dport_region,
+            i_dport_addr => i_dport_addr,
+            i_dport_wdata => i_dport_wdata,
+            o_dport_ready => o_dport_ready,
+            o_dport_rdata => o_dport_rdata,
+            o_halted => o_halted,
+            o_flush_address => wb_flush_address,
+            o_flush_valid => w_flush_valid,
+            o_data_flush_address => wb_data_flush_address,
+            o_data_flush_valid => w_data_flush_valid,
+            i_data_flush_end => w_data_flush_end,
+            i_istate => wb_istate,
+            i_dstate => wb_dstate,
+            i_cstate => wb_cstate
+        );
+    end generate netlist_generate;
+
+    assert_end_sim : if power_sim_estimation = true generate
+      cyclelogic : process (i_clk, i_nrst)
+        variable my_line : line;
+        variable clk_counter : std_logic_vector(31 downto 0);
+      begin
+        if rising_edge(i_clk) and i_clk = '1' and i_nrst = '0' then
+
+          -- reset clk cycle counter
+          clk_counter := "00000000000000000000000000000000";
+
+          write(my_line, string'(" Resetting DUT "));
+          writeline(output, my_line);
+
+        elsif rising_edge(i_clk) and i_clk = '1' and i_nrst = '1' then
+
+          -- increment clk cycle counter
+          clk_counter := clk_counter + '1';
+
+          -- print tracing information for simulation and hardware
+          write(my_line, string'(" CLK("));
+          hwrite(my_line, clk_counter);
+          write(my_line, string'(") ADDR(0x"));
+          hwrite(my_line, wb_resp_ctrl_addr);
+          write(my_line, string'(") DASM(0x"));
+          hwrite(my_line, wb_resp_ctrl_data);
+          write(my_line, string'(") O_CTRL_READY("));
+          write(my_line, w_resp_ctrl_ready);
+          write(my_line, string'(")"));
+          writeline(output, my_line);
+
+          -- to prevent infinite sim, we force break when power estimating
+          assert wb_resp_ctrl_addr /= POWER_SIM_STOP_ADDR report "Correct End of Simulation" severity failure;
+
+        end if;
+      end process;
+    end generate assert_end_sim;
+
+    cache0 : CacheTop generic map (
         memtech => memtech,
         async_reset => async_reset,
         coherence_ena => coherence_ena

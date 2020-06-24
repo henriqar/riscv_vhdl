@@ -1,1 +1,5 @@
 .svn
+fv/
+*.log*
+local_power.tcl
+ncsim_power_settings

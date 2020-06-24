@@ -1285,6 +1285,7 @@ package river_cfg is
   --! @param[out] o_dport_rdata        Response value
   component RiverTop is
   generic (
+    power_sim_estimation : boolean := false;
     memtech : integer := 0;
     hartid : integer := 0;
     async_reset : boolean := false;
