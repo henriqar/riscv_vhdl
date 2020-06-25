@@ -9,18 +9,23 @@ BENCH=asic_top_tb
 CYCLES=30000
 
 INC=+incdir+${RTL_HOME}
-VLOG_PARAMS_TB=-64 -sv -work work
-VHDL_PARAMS=-64 -v93 -smartorder -V200X
-ELAB_PARAMS=-64 -v93 -namemap_mixgen -timescale ${TIMESCALE} \
+VLOG_PARAMS_TB=-64 -sv -work work -update
+VHDL_PARAMS=-64 -v93 -smartorder -V200X -update
+ELAB_PARAMS=-64 -v93 -namemap_mixgen -update -timescale ${TIMESCALE} \
             -access +rwc
 SIM_OPTS = -64 -input ./ncsim_settings work.${BENCH} +cycles=${CYCLES}
 
 TOOL_PATH := ${XCELIUM}
-POWER_DIR := ${TOP_ROOT}/../examples/power-nangate15/test
 # POWER_DIR := ${TOP_ROOT}/../examples/power-nangate15/rv64g-hex
 POWER_HEX_SRCS=$(wildcard $(POWER_DIR)/*.hex)
-POWER_TIMEBOMB := 20ms
-POWER_SIM_OPTS = -64 -input ./ncsim_power_settings +cycles=${CYCLES} work.${BENCH}
+
+POWER_TIMEBOMB := 5000us
+POWER_SIM_OPTS = -64 -update -input ./ncsim_power_settings +cycles=${CYCLES} work.${BENCH}
+
+POWER_DIR := ${TOP_ROOT}/../examples/power-nangate15/test
+TCF_FILES_DIR := tcf_files
+
+TCF_FILES=$(patsubst $(POWER_DIR)/%.hex, ${TCF_FILES_DIR}/%.hex.tcf, $(POWER_HEX_SRCS))
 
 prep:
 	@mkdir -p work
@@ -80,27 +85,51 @@ sim-pre-power: prep clr_logs
 		done; \
 	}
 
-sim-pos-power: prep clr_logs
+# POWER_HEX_SRCS=$(wildcard $(POWER_DIR)/*.hex)
+${TCF_FILES_DIR}/%.hex.tcf: $(POWER_DIR)/%.hex
 	@{  set -e;\
-		for test in $(POWER_HEX_SRCS); do \
-			hexname=`basename $$test`; \
-			printf "\033[0;32mCompiling $$hexname\033[0m\n"; \
-	        ${TOOL_PATH}/xmvlog ${VLOG_PARAMS_TB} ${INC}   	    -f	vlog_power.f; \
-	        ${TOOL_PATH}/xmvhdl ${VHDL_PARAMS} -work commonlib 	-f  lists/commonlib.f; \
-	        ${TOOL_PATH}/xmvhdl ${VHDL_PARAMS} -work ambalib   	-f  lists/ambalib.f; \
-	        ${TOOL_PATH}/xmvhdl ${VHDL_PARAMS} -work techmap   	-f  lists/techmap.f; \
-	        ${TOOL_PATH}/xmvhdl ${VHDL_PARAMS} -work ethlib 	-f  lists/ethlib.f; \
-	        ${TOOL_PATH}/xmvhdl ${VHDL_PARAMS} -work misclib  	-f  lists/misclib.f; \
-	        ${TOOL_PATH}/xmvhdl ${VHDL_PARAMS} -work riverlib  	-f  lists/riverlib.f; \
-	        ${TOOL_PATH}/xmvhdl ${VHDL_PARAMS} -work gnsslib  	-f  lists/gnsslib.f; \
-	        ${TOOL_PATH}/xmvhdl ${VHDL_PARAMS} -work work      	-f  vhdl.f; \
-			printf "\033[0;32mElaborating $$hexname\033[0m\n"; \
-	        ${TOOL_PATH}/xmelab ${ELAB_PARAMS} -work work -generic 'power_sim_estimation=>"true"' -generic "power_hex_file=>\"./$$test\"" ${BENCH}; \
-			printf "\033[0;32mRunning $$hexname\033[0m\n"; \
-			sed "s/sub/$$hexname/g; s/\$$timebomb/${POWER_TIMEBOMB}/g" xmsim_power_settings > ncsim_power_settings; \
-	        ${TOOL_PATH}/xmsim ${POWER_SIM_OPTS} -logfile xmsimlog/$$hexname.log; \
-		done; \
+		hexname=`basename $^`; \
+		printf "\033[0;32mCompiling $$hexname\033[0m\n"; \
+		${TOOL_PATH}/xmvlog ${VLOG_PARAMS_TB} ${INC}   	    -f	vlog_power.f; \
+		${TOOL_PATH}/xmvhdl ${VHDL_PARAMS} -work commonlib 	-f  lists/commonlib.f; \
+		${TOOL_PATH}/xmvhdl ${VHDL_PARAMS} -work ambalib   	-f  lists/ambalib.f; \
+		${TOOL_PATH}/xmvhdl ${VHDL_PARAMS} -work techmap   	-f  lists/techmap.f; \
+		${TOOL_PATH}/xmvhdl ${VHDL_PARAMS} -work ethlib 	-f  lists/ethlib.f; \
+		${TOOL_PATH}/xmvhdl ${VHDL_PARAMS} -work misclib  	-f  lists/misclib.f; \
+		${TOOL_PATH}/xmvhdl ${VHDL_PARAMS} -work riverlib  	-f  lists/riverlib.f; \
+		${TOOL_PATH}/xmvhdl ${VHDL_PARAMS} -work gnsslib  	-f  lists/gnsslib.f; \
+		${TOOL_PATH}/xmvhdl ${VHDL_PARAMS} -work work      	-f  vhdl.f; \
+		printf "\033[0;32mElaborating $$hexname\033[0m\n"; \
+		${TOOL_PATH}/xmelab ${ELAB_PARAMS} -work work -generic 'power_sim_estimation=>"true"' -generic "power_hex_file=>\"./$^\"" ${BENCH}; \
+		printf "\033[0;32mRunning $$hexname\033[0m\n"; \
+		sed "s/sub/$$hexname/g; s/\$$timebomb/${POWER_TIMEBOMB}/g" xmsim_power_settings > ncsim_power_settings; \
+		${TOOL_PATH}/xmsim ${POWER_SIM_OPTS} -logfile xmsimlog/$$hexname.log; \
 	}
+
+sim-pos-power: prep clr_logs ${TCF_FILES}
+
+
+# sim-pos-power: prep clr_logs
+# 	@{  set -e;\
+# 		for test in $(POWER_HEX_SRCS); do \
+# 			hexname=`basename $$test`; \
+# 			printf "\033[0;32mCompiling $$hexname\033[0m\n"; \
+# 	        ${TOOL_PATH}/xmvlog ${VLOG_PARAMS_TB} ${INC}   	    -f	vlog_power.f; \
+# 	        ${TOOL_PATH}/xmvhdl ${VHDL_PARAMS} -work commonlib 	-f  lists/commonlib.f; \
+# 	        ${TOOL_PATH}/xmvhdl ${VHDL_PARAMS} -work ambalib   	-f  lists/ambalib.f; \
+# 	        ${TOOL_PATH}/xmvhdl ${VHDL_PARAMS} -work techmap   	-f  lists/techmap.f; \
+# 	        ${TOOL_PATH}/xmvhdl ${VHDL_PARAMS} -work ethlib 	-f  lists/ethlib.f; \
+# 	        ${TOOL_PATH}/xmvhdl ${VHDL_PARAMS} -work misclib  	-f  lists/misclib.f; \
+# 	        ${TOOL_PATH}/xmvhdl ${VHDL_PARAMS} -work riverlib  	-f  lists/riverlib.f; \
+# 	        ${TOOL_PATH}/xmvhdl ${VHDL_PARAMS} -work gnsslib  	-f  lists/gnsslib.f; \
+# 	        ${TOOL_PATH}/xmvhdl ${VHDL_PARAMS} -work work      	-f  vhdl.f; \
+# 			printf "\033[0;32mElaborating $$hexname\033[0m\n"; \
+# 	        ${TOOL_PATH}/xmelab ${ELAB_PARAMS} -work work -generic 'power_sim_estimation=>"true"' -generic "power_hex_file=>\"./$$test\"" ${BENCH}; \
+# 			printf "\033[0;32mRunning $$hexname\033[0m\n"; \
+# 			sed "s/sub/$$hexname/g; s/\$$timebomb/${POWER_TIMEBOMB}/g" xmsim_power_settings > ncsim_power_settings; \
+# 	        ${TOOL_PATH}/xmsim ${POWER_SIM_OPTS} -logfile xmsimlog/$$hexname.log; \
+# 		done; \
+# 	}
 
 clean:
 	@rm -f *.log *.key *.diag *.err

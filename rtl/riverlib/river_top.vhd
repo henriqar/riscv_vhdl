@@ -246,6 +246,7 @@ begin
         variable my_line : line;
         variable clk_counter : std_logic_vector(31 downto 0);
       begin
+
         if rising_edge(i_clk) and i_clk = '1' and i_nrst = '0' then
 
           -- reset clk cycle counter
@@ -266,12 +267,18 @@ begin
           hwrite(my_line, wb_resp_ctrl_addr);
           write(my_line, string'(") DASM(0x"));
           hwrite(my_line, wb_resp_ctrl_data);
-          write(my_line, string'(") O_CTRL_READY("));
+          write(my_line, string'(") O_CTRL_RDY("));
           write(my_line, w_resp_ctrl_ready);
+          write(my_line, string'(") LFAULT("));
+          write(my_line, w_resp_ctrl_load_fault);
+          write(my_line, string'(") EXEC("));
+          write(my_line, w_resp_ctrl_executable);
           write(my_line, string'(")"));
           writeline(output, my_line);
 
+
           -- to prevent infinite sim, we force break when power estimating
+          assert clk_counter /= "00000000000000011111111111111111" report "Fatal End of Simulation" severity failure;
           assert wb_resp_ctrl_addr /= POWER_SIM_STOP_ADDR report "Correct End of Simulation" severity failure;
 
         end if;
